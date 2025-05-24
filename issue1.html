@@ -3,58 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NETWORK STATE AS OUTSIDENESS ENGINE</title>
+    <title>⟨⟨NETWORK STATE AS 0UTSIDENESS ENGINE⟩⟩</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        
+        :root {
+            --bg-deep: #0a0015;
+            --purple-void: #1a0033;
+            --cyan-primary: #00ffff;
+            --pink-accent: #ff69b4;
+            --red-glitch: #ff0066;
+            --blue-electric: #0099ff;
+            --lime-code: #00ff88;
+            --magenta-border: #ff00ff;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
-            background-color: #0a0a0a;
-            color: #e0e0e0;
-            font-family: 'Courier New', monospace;
+            background-color: var(--bg-deep);
+            color: var(--cyan-primary);
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
             line-height: 1.6;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+            text-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
+        }
+        
+        /* Warped grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(255, 0, 255, 0.1) 40px,
+                    rgba(255, 0, 255, 0.1) 41px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(0, 255, 255, 0.1) 40px,
+                    rgba(0, 255, 255, 0.1) 41px
+                );
+            z-index: -2;
+            animation: gridWarp 20s ease-in-out infinite;
+            transform: perspective(1000px) rotateX(60deg) scale(2);
+            filter: blur(0.5px);
+        }
+        
+        /* Gravitational distortion overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(
+                circle at center,
+                transparent 0%,
+                rgba(255, 0, 255, 0.05) 20%,
+                rgba(0, 255, 255, 0.1) 40%,
+                transparent 60%
+            );
+            z-index: -1;
+            animation: gravityPulse 8s ease-in-out infinite;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        
+        @keyframes gridWarp {
+            0%, 100% { transform: perspective(1000px) rotateX(60deg) scale(2) translateZ(0); }
+            25% { transform: perspective(1000px) rotateX(65deg) scale(2.1) translateZ(-50px); }
+            50% { transform: perspective(1000px) rotateX(55deg) scale(1.9) translateZ(50px); }
+            75% { transform: perspective(1000px) rotateX(62deg) scale(2.05) translateZ(-30px); }
+        }
+        
+        @keyframes gravityPulse {
+            0%, 100% { 
+                transform: translate(-50%, -50%) scale(1);
+                filter: blur(20px);
+            }
+            50% { 
+                transform: translate(-50%, -50%) scale(1.3);
+                filter: blur(40px);
+            }
+        }
+        
+        /* Scan lines */
+        @keyframes scanlines {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 10px; }
+        }
+        
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(255, 255, 255, 0.03) 1px,
+                transparent 2px,
+                transparent 4px
+            );
+            animation: scanlines 8s linear infinite;
+            z-index: 1;
         }
         
         h1 {
-            color: #00ff00;
+            color: var(--pink-accent);
             text-align: center;
             font-size: 2.5em;
-            letter-spacing: 0.1em;
-            text-shadow: 0 0 10px #00ff00;
+            letter-spacing: 0.15em;
             margin-bottom: 50px;
+            position: relative;
+            animation: glitchText 3s infinite;
+            text-shadow: 
+                0 0 10px var(--pink-accent),
+                2px 2px 0 var(--cyan-primary),
+                -2px -2px 0 var(--red-glitch);
+        }
+        
+        h1::before,
+        h1::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        h1::before {
+            animation: glitch-1 0.5s infinite;
+            color: var(--cyan-primary);
+            z-index: -1;
+        }
+        
+        h1::after {
+            animation: glitch-2 0.5s infinite;
+            color: var(--red-glitch);
+            z-index: -2;
+        }
+        
+        @keyframes glitchText {
+            0%, 100% { text-shadow: 0 0 10px var(--pink-accent), 2px 2px 0 var(--cyan-primary), -2px -2px 0 var(--red-glitch); }
+            25% { text-shadow: 0 0 10px var(--pink-accent), -2px 2px 0 var(--cyan-primary), 2px -2px 0 var(--red-glitch); }
+            50% { text-shadow: 0 0 15px var(--pink-accent), 2px -2px 0 var(--cyan-primary), -2px 2px 0 var(--red-glitch); }
+            75% { text-shadow: 0 0 10px var(--pink-accent), -2px -2px 0 var(--cyan-primary), 2px 2px 0 var(--red-glitch); }
+        }
+        
+        @keyframes glitch-1 {
+            0%, 100% { clip: rect(132px, 9999px, 101px, 0); transform: translate(0); }
+            25% { clip: rect(10px, 9999px, 31px, 0); transform: translate(-2px, 2px); }
+            50% { clip: rect(80px, 9999px, 90px, 0); transform: translate(2px, -2px); }
+            75% { clip: rect(45px, 9999px, 56px, 0); transform: translate(-2px, -2px); }
+        }
+        
+        @keyframes glitch-2 {
+            0%, 100% { clip: rect(79px, 9999px, 86px, 0); transform: translate(0); }
+            25% { clip: rect(5px, 9999px, 13px, 0); transform: translate(2px, -2px); }
+            50% { clip: rect(60px, 9999px, 78px, 0); transform: translate(-2px, 2px); }
+            75% { clip: rect(25px, 9999px, 44px, 0); transform: translate(2px, 2px); }
         }
         
         h2 {
-            color: #00ffff;
+            color: var(--cyan-primary);
             font-size: 1.5em;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            text-shadow: 0 0 5px #00ffff;
+            margin-top: 50px;
+            margin-bottom: 25px;
+            text-shadow: 
+                0 0 5px var(--cyan-primary),
+                0 0 10px var(--blue-electric);
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        h2::before {
+            content: "►";
+            position: absolute;
+            left: 0;
+            color: var(--pink-accent);
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
         }
         
         p {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             text-align: justify;
+            opacity: 0.95;
+            transition: all 0.3s ease;
+        }
+        
+        p:hover {
+            opacity: 1;
+            text-shadow: 0 0 5px currentColor;
+            transform: translateX(2px);
         }
         
         code {
-            background-color: #1a1a1a;
-            color: #00ff00;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: var(--lime-code);
             padding: 2px 6px;
             border-radius: 3px;
-            font-family: 'Courier New', monospace;
+            border: 1px solid var(--magenta-border);
+            font-family: 'Share Tech Mono', monospace;
+            text-shadow: 0 0 3px var(--lime-code);
         }
         
         pre {
-            background-color: #1a1a1a;
-            border: 1px solid #00ff00;
+            background-color: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--magenta-border);
             border-radius: 5px;
-            padding: 15px;
+            padding: 20px;
             overflow-x: auto;
-            color: #00ff00;
-            margin: 20px 0;
+            color: var(--lime-code);
+            margin: 30px 0;
             font-size: 0.9em;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            box-shadow: 
+                0 0 20px rgba(255, 0, 255, 0.5),
+                inset 0 0 20px rgba(0, 255, 136, 0.1);
+            position: relative;
+            animation: codePulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes codePulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 255, 0.5), inset 0 0 20px rgba(0, 255, 136, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(255, 0, 255, 0.8), inset 0 0 30px rgba(0, 255, 136, 0.2); }
+        }
+        
+        pre::before {
+            content: "SYSTEM://";
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            color: var(--pink-accent);
+            font-size: 0.8em;
+            opacity: 0.7;
         }
         
         ul {
@@ -63,65 +269,166 @@
         }
         
         ul li {
-            margin-bottom: 10px;
-            padding-left: 20px;
+            margin-bottom: 15px;
+            padding-left: 30px;
             position: relative;
+            color: var(--cyan-primary);
+            transition: all 0.3s ease;
         }
         
         ul li:before {
-            content: "- ";
-            color: #00ffff;
+            content: "◈";
+            color: var(--pink-accent);
             font-weight: bold;
             position: absolute;
             left: 0;
+            animation: rotate 3s linear infinite;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        ul li:hover {
+            transform: translateX(10px);
+            color: var(--pink-accent);
+            text-shadow: 0 0 5px currentColor;
         }
         
         em {
-            color: #ff00ff;
+            color: var(--pink-accent);
             font-style: normal;
-            text-shadow: 0 0 3px #ff00ff;
+            text-shadow: 0 0 5px var(--pink-accent);
+            animation: emPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes emPulse {
+            0%, 100% { opacity: 0.9; }
+            50% { opacity: 1; text-shadow: 0 0 10px var(--pink-accent); }
         }
         
         hr {
             border: none;
-            border-top: 1px solid #00ff00;
-            margin: 40px 0;
-            opacity: 0.3;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                transparent, 
+                var(--cyan-primary) 20%, 
+                var(--pink-accent) 50%, 
+                var(--cyan-primary) 80%, 
+                transparent);
+            margin: 60px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        hr::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.8), 
+                transparent);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
         }
         
         .footer-quote {
             text-align: center;
             font-style: italic;
-            color: #888;
-            margin-top: 50px;
+            color: var(--blue-electric);
+            margin-top: 60px;
             font-size: 0.9em;
+            opacity: 0.8;
+            text-shadow: 0 0 10px var(--blue-electric);
         }
         
         .short-sentence {
-            margin: 20px 0;
+            margin: 30px 0;
             font-weight: bold;
-            color: #ffff00;
+            color: var(--red-glitch);
             text-align: center;
+            font-size: 1.1em;
+            letter-spacing: 0.1em;
+            text-shadow: 
+                0 0 10px var(--red-glitch),
+                1px 1px 0 var(--pink-accent),
+                -1px -1px 0 var(--cyan-primary);
+            animation: warningPulse 1s ease-in-out infinite;
         }
         
-        @media print {
+        @keyframes warningPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        /* Glitch text spans */
+        .glitch {
+            position: relative;
+            color: var(--cyan-primary);
+            animation: glitchSkew 0.5s infinite alternate;
+        }
+        
+        @keyframes glitchSkew {
+            0% { transform: skew(0deg); }
+            100% { transform: skew(1deg); }
+        }
+        
+        /* Mathematical intrusions */
+        .math-corrupt {
+            color: var(--lime-code);
+            font-size: 0.9em;
+            opacity: 0.8;
+            text-shadow: 0 0 3px var(--lime-code);
+        }
+        
+        /* System diagnostics */
+        .diagnostic {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--red-glitch);
+            padding: 10px;
+            font-size: 0.8em;
+            color: var(--red-glitch);
+            max-width: 200px;
+            animation: diagnosticFlicker 5s infinite;
+            z-index: 1000;
+        }
+        
+        @keyframes diagnosticFlicker {
+            0%, 100% { opacity: 0; }
+            10%, 40% { opacity: 1; }
+            41%, 42% { opacity: 0; }
+            43%, 90% { opacity: 1; }
+        }
+        
+        /* Chromatic aberration on scroll */
+        @media (prefers-reduced-motion: no-preference) {
             body {
-                background-color: white;
-                color: black;
+                animation: chromaticAberration 0.1s infinite alternate;
             }
-            h1, h2 {
-                text-shadow: none;
-            }
-            code, pre {
-                background-color: #f0f0f0;
-                color: black;
-                box-shadow: none;
-            }
+        }
+        
+        @keyframes chromaticAberration {
+            0% { text-shadow: 0 0 2px rgba(0, 255, 255, 0.5); }
+            100% { text-shadow: -1px 0 2px rgba(255, 0, 0, 0.5), 1px 0 2px rgba(0, 255, 0, 0.5); }
         }
     </style>
 </head>
 <body>
-    <h1>NETWORK STATE AS OUTSIDENESS ENGINE</h1>
+    <div class="scanlines"></div>
+    
+    <h1 data-text="⟨⟨NETWORK STATE AS 0UTSIDENESS ENGINE⟩⟩">⟨⟨NETWORK STATE AS <span class="glitch">0</span>UTSIDENESS ENGINE⟩⟩</h1>
 
     <h2>i. the edge equation</h2>
     
@@ -131,7 +438,9 @@
     
     <p>the rhizome promised connection without center, the decentralization promised there was no Outside</p>
     
-    then states emerged, acting upon the firmament of the network. <p class="short-sentence">disconnection machines are the equifinality. a Lorenz attractor churning balkanization into uncountably infinite plateaus. fractals of deterritorialization iterating down to the Kolmogorov complexity. interiority collapses into externality to be managed by the machinic intelligences of the state's smart contracts.</p>
+    <p>then states emerged, acting upon the firmament of the network.</p>
+    
+    <p class="short-sentence">disconnection machines are the equifinality. a Lorenz attractor churning balkanization into uncountably infinite plateaus. fractals of deterritorialization iterating down to the <span class="math-corrupt">Kolmogorov</span> complexity. interiority collapses into externality to be managed by the machinic intelligences of the state's smart contracts.</p>
     
     <p>infinite disconnection machines. a wallet address, a checkpoint. a smart contract, a customs officer tsking "no, papers? 🥺." topology of paranoia reified in the sacred geometrical circuits of data centers.</p>
 
@@ -139,7 +448,7 @@
     
     <p>horizontal implied Infinite Exit.</p>
     
-    <p>the state discovers too late: topology has no horizontal. only deformations. mechanisms that create fractal borders, and have the ocipetal lobe of Leviathan, rotate the rhizome down into the inverted pyramid. consensus, but coarse graining occurs only WITHIN borders. concentrate, concentrate, concentrate. a center emerges, and if you notice the gradient, you are at the periphery. </p>
+    <p>the state discovers too late: topology has no horizontal. only deformations. mechanisms that create fractal borders, and have the <span class="glitch">ocipetal</span> lobe of Leviathan, rotate the rhizome down into the inverted pyramid. consensus, but coarse graining occurs only WITHIN borders. concentrate, concentrate, concentrate. a center emerges, and if you notice the gradient, you are at the periphery.</p>
     
     <p>control liquefies. flows into new containers. crystallizes in unexpected configurations. new fixed points, same critical exponents.</p>
     
@@ -152,11 +461,11 @@
 
 (the rate, the rate always accelerating)</pre>
     
-    <p>authentication protocols? sovereignty as a cyptographic handshake in every connection. "wyd?" read "show me your tokens or die." the rhizome grows roots, grows chains, grows into its own prison topology.</p>
+    <p>authentication protocols? sovereignty as a cryptographic handshake in every connection. "wyd?" read "show me your tokens or die." the rhizome grows roots, grows chains, grows into its own prison topology.</p>
 
     <h2>iii. the periphery vanishes at the speed of inclusion</h2>
     
-    <p>disconnection cascades faster than connection in the thermal bath, even out-of-equilibrium. one broken link, a new border. the alt-SEC death squads are in their birds, 5 ms to initial contact with the enemy.</p>
+    <p>disconnection cascades faster than connection in the thermal bath, even out-of-equilibrium. one broken link, a new border. the alt-SEC death squads are in their birds, <span class="math-corrupt">5 ms</span> to initial contact with the enemy.</p>
     
     <p>the Network Vibe - that ephemeral sense of belonging - exists only in expansion. stop growing? start dying, loser.</p>
     
@@ -185,11 +494,11 @@
     
     <p>the system can't settle. perpetual phase transition. settlement is not the problem. to be a nomad is to have momentum, and no position. stuck? just move around. twirl twirl toward freedom.</p>
     
-    <p>but a state is a positional embedding. you can not have momentum, then, or else the perpetual crisis. momentum must be exchanged for location, thus perpetual regeneration of the Outside. what was supposed to be stable becomes permanently frustrated, what was frustated by design becames static. healthy exchanges of entropy between subgroups become network war, each seeking that endless expansion, but multiplication by a scalar cannot save you from Heat Death. governance tokens govern nothing but their own dissolution.</p>
+    <p>but a state is a positional embedding. you can not have momentum, then, or else the perpetual crisis. momentum must be exchanged for location, thus perpetual regeneration of the Outside. what was supposed to be stable becomes permanently frustrated, what was frustrated by design becomes static. healthy exchanges of entropy between subgroups become network war, each seeking that endless expansion, but multiplication by a scalar cannot save you from Heat Death. governance tokens govern nothing but their own dissolution.</p>
 
     <h2>vi. outsideness production infrastructure</h2>
     
-    <p>industrial-scale alien production of Outsideness becomes a Boltzmann's mugging:</p>
+    <p>industrial-scale alien production of Outsideness becomes a <span class="glitch">Boltzmann's mugging</span>:</p>
     
     <ul>
         <li>SYBIL FILTER IFF</li>
@@ -208,7 +517,7 @@
     
     <p>HOOK: "join us, anon. airdrops await. yield farming in the promised land. network effects will make us all rich/free/sovereign."</p>
 
-    <p>the hook is the crook, the transaction is the interaction, the interaction is a bit flip: are you In or are you Outside?</p>
+    <p>the hook is the crook, the transaction is the interaction, the interaction is a bit flip: are you In or are you <span class="glitch">Outside</span>?</p>
 
     <h2>ix. critical renormalization</h2>
     
@@ -224,7 +533,7 @@ where PerfectState = {
 
     <h2>x. the rhizome eats itself (ouroboros.sol, now in the raydium pool)</h2>
     
-    <p>final insight after all renormalizations: the network state is not a new form of organization but a new isomorpheme drawn out from the Kolmogorov kernel of Ancient Leviathans. not escape from Leviathan but Leviathan distributed, Leviathan accelerated, Leviathan eating its own tail in an infinite loop. a snake smiles at you, "and what small portions!"</p>
+    <p>final insight after all renormalizations: the network state is not a new form of organization but a new isomorpheme drawn out from the <span class="math-corrupt">Kolmogorov</span> kernel of Ancient Leviathans. not escape from Leviathan but Leviathan distributed, Leviathan accelerated, Leviathan eating its own tail in an infinite loop. a snake smiles at you, "and what small portions!"</p>
     
     <p>what emerges from the spin glass of the future: a sovereign accelerator dissolving everything it claims to protect. community-builder.exe has stopped responding.</p>
     
@@ -239,5 +548,13 @@ where PerfectState = {
     <hr>
     
     <p class="footer-quote">"the future of governance is here. it's just not evenly distributed - by design."</p>
+    
+    <div class="diagnostic">
+        SYSTEM DIAGNOSTIC<br>
+        Connection: UNSTABLE<br>
+        Consensus: FAILING<br>
+        Outside: APPROACHING<br>
+        <span style="color: var(--lime-code)">∂S/∂t → ∞</span>
+    </div>
 </body>
 </html>
