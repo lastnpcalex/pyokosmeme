@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-⟨⟨ ZINE INDEX GENERATOR ⟩⟩
+⟨⟨ INDEX GENERATOR ⟩⟩
 Scans for *.html files ONE LEVEL below repo root, 
 groups by folder → generates index with neo-cyber aesthetic
 """
@@ -11,7 +11,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT  = os.path.join(ROOT, "index.html")
 
 # ── Aesthetic Configuration ────────────────────────────────────────────────────
-PAGE_TITLE  = "⟨⟨SPINGL∆SS ZINE ∆RCHIVE⟩⟩"
+PAGE_TITLE  = "⟨⟨SPINGL∆SS INDEX ∆RCHIVE⟩⟩"
 MAIN_HEADING = PAGE_TITLE
 
 # Glitch variations for dynamic headers
