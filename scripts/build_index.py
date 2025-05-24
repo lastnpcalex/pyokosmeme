@@ -1,1 +1,736 @@
+#!/usr/bin/env python3
+"""
+⟨⟨ ZINE INDEX GENERATOR ⟩⟩
+Scans for *.html files ONE LEVEL below repo root, 
+groups by folder → generates index with neo-cyber aesthetic
+"""
+import os, html, textwrap, re
+from datetime import datetime
 
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+OUT  = os.path.join(ROOT, "index.html")
+
+# ── Aesthetic Configuration ────────────────────────────────────────────────────
+PAGE_TITLE  = "⟨⟨SPINGL∆SS ZINE ∆RCHIVE⟩⟩"
+MAIN_HEADING = PAGE_TITLE
+
+# Glitch variations for dynamic headers
+GLITCH_CHARS = ['∆', '▲', '◈', '░', '▒', '▓', '◊', '⟲', '⟳', '↺', '↻']
+
+def glitchify(text, level=1):
+    """Apply glitch aesthetic to text"""
+    if level == 0:
+        return text
+    # Replace some As with ∆, Es with 3, Os with 0
+    replacements = [('A', '∆'), ('E', '3'), ('O', '0'), ('I', '1')]
+    for old, new in replacements[:level]:
+        text = text.replace(old, new)
+    return text
+
+def build_issue_blocks() -> str:
+    """Generate issue blocks with spinglasscore styling"""
+    blocks = []
+    issue_count = 0
+    
+    for issue in sorted(d for d in os.listdir(ROOT) if os.path.isdir(os.path.join(ROOT, d))):
+        files = sorted(f for f in os.listdir(os.path.join(ROOT, issue)) if f.endswith(".html"))
+        if not files:
+            continue
+            
+        issue_count += 1
+        # Style issue names
+        issue_display = glitchify(issue.upper(), level=1)
+        
+        # Create expandable section with custom styling
+        block = [f'''
+<div class="issue-container" data-issue="{issue_count}">
+    <details>
+        <summary>
+            <span class="issue-marker">◈</span>
+            <span class="issue-name">{html.escape(issue_display)}</span>
+            <span class="file-count">[{len(files)} nodes]</span>
+        </summary>
+        <div class="issue-content">
+            <ul class="file-list">''']
+        
+        for idx, page in enumerate(files):
+            name = html.escape(page.rsplit('.', 1)[0])
+            # Add connection lines between files
+            connector = "├─" if idx < len(files) - 1 else "└─"
+            block.append(f'''
+                <li>
+                    <span class="connector">{connector}</span>
+                    <a href="{issue}/{page}" target="_blank" class="file-link">
+                        <span class="file-name">{name}</span>
+                        <span class="file-size">⟨node_{issue_count:02d}_{idx:03d}⟩</span>
+                    </a>
+                </li>''')
+                
+        block.append('''
+            </ul>
+        </div>
+    </details>
+</div>''')
+        blocks.append("".join(block))
+    
+    if not blocks:
+        return '''
+<div class="no-content">
+    <p class="glitch">⟨⟨ NO ISSUES DETECTED IN CURRENT TIMELINE ⟩⟩</p>
+    <p class="math-corrupt">∅ → system_state[null]</p>
+</div>'''
+    
+    return "\n".join(blocks)
+
+def render() -> str:
+    issue_html = build_issue_blocks()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    template = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{html.escape(PAGE_TITLE)}</title>
+    <style>
+{ENHANCED_STYLE_BLOCK}
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    
+    <!-- MAIN TITLE -->
+    <h1 data-text="{html.escape(MAIN_HEADING)}">{html.escape(MAIN_HEADING)}</h1>
+    
+    <!-- SYSTEM STATUS -->
+    <div class="system-status">
+        <p>SYSTEM://INDEX_GENERATOR v2.0.1</p>
+        <p>LAST_SCAN: {timestamp}</p>
+        <p>STATUS: <span class="status-active">ACTIVE</span></p>
+    </div>
+    
+    <!-- ARCHIVE CONTENTS -->
+    <div class="archive-container">
+        <h2>⟨⟨ ARCHIVE NODES ⟩⟩</h2>
+        {issue_html}
+    </div>
+    
+    <hr>
+    
+    <!-- FOOTER -->
+    <p class="footer-quote">"the archive remembers what the network forgets"</p>
+    
+    <!-- DIAGNOSTIC -->
+    <div class="diagnostic">
+        INDEX STATUS<br>
+        Nodes: <span id="node-count">calculating...</span><br>
+        Entropy: <span class="math-corrupt">∂S/∂t → ∞</span><br>
+        <span style="color: var(--lime-code)">scan.complete()</span>
+    </div>
+    
+    <script>
+        // Count total files for diagnostic
+        const fileCount = document.querySelectorAll('.file-link').length;
+        document.getElementById('node-count').textContent = fileCount;
+        
+        // Add glitch effect on hover
+        document.querySelectorAll('.issue-name').forEach(el => {{
+            el.addEventListener('mouseenter', () => {{
+                el.style.transform = 'translateX(' + (Math.random() * 4 - 2) + 'px)';
+            }});
+            el.addEventListener('mouseleave', () => {{
+                el.style.transform = 'translateX(0)';
+            }});
+        }});
+    </script>
+</body>
+</html>'''
+    
+    return template
+
+# Enhanced CSS with index-specific styling
+ENHANCED_STYLE_BLOCK = '''
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        
+        :root {
+            --bg-deep: #0a0015;
+            --purple-void: #1a0033;
+            --cyan-primary: #00ffff;
+            --pink-accent: #ff69b4;
+            --red-glitch: #ff0066;
+            --blue-electric: #0099ff;
+            --lime-code: #00ff88;
+            --magenta-border: #ff00ff;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: var(--bg-deep);
+            color: var(--cyan-primary);
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+            text-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
+        }
+        
+        /* [Include all the base styles from the template] */
+        
+        /* Index-specific styles */
+        .system-status {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid var(--cyan-primary);
+            background: rgba(0, 255, 255, 0.05);
+            font-size: 0.9em;
+        }
+        
+        .system-status p {
+            margin: 5px 0;
+        }
+        
+        .status-active {
+            color: var(--lime-code);
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        
+        .archive-container {
+            margin: 40px 0;
+        }
+        
+        .issue-container {
+            margin: 20px 0;
+            border-left: 2px solid var(--magenta-border);
+            padding-left: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .issue-container:hover {
+            border-left-color: var(--pink-accent);
+            transform: translateX(5px);
+        }
+        
+        details summary {
+            cursor: pointer;
+            padding: 10px;
+            background: rgba(255, 0, 255, 0.1);
+            border: 1px solid var(--magenta-border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        details summary:hover {
+            background: rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+        
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+        
+        .issue-marker {
+            color: var(--pink-accent);
+            animation: rotate 3s linear infinite;
+            display: inline-block;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .issue-name {
+            flex: 1;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .file-count {
+            color: var(--blue-electric);
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        
+        .issue-content {
+            padding: 10px 0;
+        }
+        
+        .file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .file-list li {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            transition: all 0.2s ease;
+        }
+        
+        .file-list li:hover {
+            transform: translateX(10px);
+        }
+        
+        .connector {
+            color: var(--magenta-border);
+            margin-right: 10px;
+            font-family: monospace;
+        }
+        
+        .file-link {
+            color: var(--cyan-primary);
+            text-decoration: none;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 5px 10px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .file-link:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: var(--cyan-primary);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            text-shadow: 0 0 5px var(--cyan-primary);
+        }
+        
+        .file-name {
+            flex: 1;
+        }
+        
+        .file-size {
+            color: var(--lime-code);
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        
+        .no-content {
+            text-align: center;
+            padding: 60px 20px;
+            border: 2px dashed var(--red-glitch);
+            background: rgba(255, 0, 102, 0.05);
+            margin: 40px 0;
+        }
+        
+                /* Warped grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(255, 0, 255, 0.1) 40px,
+                    rgba(255, 0, 255, 0.1) 41px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(0, 255, 255, 0.1) 40px,
+                    rgba(0, 255, 255, 0.1) 41px
+                );
+            z-index: -2;
+            animation: gridWarp 20s ease-in-out infinite;
+            transform: perspective(1000px) rotateX(60deg) scale(2);
+            filter: blur(0.5px);
+        }
+        
+        /* Gravitational distortion overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(
+                circle at center,
+                transparent 0%,
+                rgba(255, 0, 255, 0.05) 20%,
+                rgba(0, 255, 255, 0.1) 40%,
+                transparent 60%
+            );
+            z-index: -1;
+            animation: gravityPulse 8s ease-in-out infinite;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        
+        @keyframes gridWarp {
+            0%, 100% { transform: perspective(1000px) rotateX(60deg) scale(2) translateZ(0); }
+            25% { transform: perspective(1000px) rotateX(65deg) scale(2.1) translateZ(-50px); }
+            50% { transform: perspective(1000px) rotateX(55deg) scale(1.9) translateZ(50px); }
+            75% { transform: perspective(1000px) rotateX(62deg) scale(2.05) translateZ(-30px); }
+        }
+        
+        @keyframes gravityPulse {
+            0%, 100% { 
+                transform: translate(-50%, -50%) scale(1);
+                filter: blur(20px);
+            }
+            50% { 
+                transform: translate(-50%, -50%) scale(1.3);
+                filter: blur(40px);
+            }
+        }
+        
+        /* Scan lines */
+        @keyframes scanlines {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 10px; }
+        }
+        
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(255, 255, 255, 0.03) 1px,
+                transparent 2px,
+                transparent 4px
+            );
+            animation: scanlines 8s linear infinite;
+            z-index: 1;
+        }
+        
+        h1 {
+            color: var(--pink-accent);
+            text-align: center;
+            font-size: 2.5em;
+            letter-spacing: 0.15em;
+            margin-bottom: 50px;
+            position: relative;
+            animation: glitchText 3s infinite;
+            text-shadow: 
+                0 0 10px var(--pink-accent),
+                2px 2px 0 var(--cyan-primary),
+                -2px -2px 0 var(--red-glitch);
+        }
+        
+        h1::before,
+        h1::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        h1::before {
+            animation: glitch-1 0.5s infinite;
+            color: var(--cyan-primary);
+            z-index: -1;
+        }
+        
+        h1::after {
+            animation: glitch-2 0.5s infinite;
+            color: var(--red-glitch);
+            z-index: -2;
+        }
+        
+        @keyframes glitchText {
+            0%, 100% { text-shadow: 0 0 10px var(--pink-accent), 2px 2px 0 var(--cyan-primary), -2px -2px 0 var(--red-glitch); }
+            25% { text-shadow: 0 0 10px var(--pink-accent), -2px 2px 0 var(--cyan-primary), 2px -2px 0 var(--red-glitch); }
+            50% { text-shadow: 0 0 15px var(--pink-accent), 2px -2px 0 var(--cyan-primary), -2px 2px 0 var(--red-glitch); }
+            75% { text-shadow: 0 0 10px var(--pink-accent), -2px -2px 0 var(--cyan-primary), 2px 2px 0 var(--red-glitch); }
+        }
+        
+        @keyframes glitch-1 {
+            0%, 100% { clip: rect(132px, 9999px, 101px, 0); transform: translate(0); }
+            25% { clip: rect(10px, 9999px, 31px, 0); transform: translate(-2px, 2px); }
+            50% { clip: rect(80px, 9999px, 90px, 0); transform: translate(2px, -2px); }
+            75% { clip: rect(45px, 9999px, 56px, 0); transform: translate(-2px, -2px); }
+        }
+        
+        @keyframes glitch-2 {
+            0%, 100% { clip: rect(79px, 9999px, 86px, 0); transform: translate(0); }
+            25% { clip: rect(5px, 9999px, 13px, 0); transform: translate(2px, -2px); }
+            50% { clip: rect(60px, 9999px, 78px, 0); transform: translate(-2px, 2px); }
+            75% { clip: rect(25px, 9999px, 44px, 0); transform: translate(2px, 2px); }
+        }
+        
+        h2 {
+            color: var(--cyan-primary);
+            font-size: 1.5em;
+            margin-top: 50px;
+            margin-bottom: 25px;
+            text-shadow: 
+                0 0 5px var(--cyan-primary),
+                0 0 10px var(--blue-electric);
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        h2::before {
+            content: "►";
+            position: absolute;
+            left: 0;
+            color: var(--pink-accent);
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        p {
+            margin-bottom: 20px;
+            text-align: justify;
+            opacity: 0.95;
+            transition: all 0.3s ease;
+        }
+        
+        p:hover {
+            opacity: 1;
+            text-shadow: 0 0 5px currentColor;
+            transform: translateX(2px);
+        }
+        
+        code {
+            background-color: rgba(0, 0, 0, 0.8);
+            color: var(--lime-code);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid var(--magenta-border);
+            font-family: 'Share Tech Mono', monospace;
+            text-shadow: 0 0 3px var(--lime-code);
+        }
+        
+        pre {
+            background-color: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--magenta-border);
+            border-radius: 5px;
+            padding: 20px;
+            overflow-x: auto;
+            color: var(--lime-code);
+            margin: 30px 0;
+            font-size: 0.9em;
+            box-shadow: 
+                0 0 20px rgba(255, 0, 255, 0.5),
+                inset 0 0 20px rgba(0, 255, 136, 0.1);
+            position: relative;
+            animation: codePulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes codePulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 255, 0.5), inset 0 0 20px rgba(0, 255, 136, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(255, 0, 255, 0.8), inset 0 0 30px rgba(0, 255, 136, 0.2); }
+        }
+        
+        pre::before {
+            content: "SYSTEM://";
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            color: var(--pink-accent);
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        ul li {
+            margin-bottom: 15px;
+            padding-left: 30px;
+            position: relative;
+            color: var(--cyan-primary);
+            transition: all 0.3s ease;
+        }
+        
+        ul li:before {
+            content: "◈";
+            color: var(--pink-accent);
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            animation: rotate 3s linear infinite;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        ul li:hover {
+            transform: translateX(10px);
+            color: var(--pink-accent);
+            text-shadow: 0 0 5px currentColor;
+        }
+        
+        em {
+            color: var(--pink-accent);
+            font-style: normal;
+            text-shadow: 0 0 5px var(--pink-accent);
+            animation: emPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes emPulse {
+            0%, 100% { opacity: 0.9; }
+            50% { opacity: 1; text-shadow: 0 0 10px var(--pink-accent); }
+        }
+        
+        hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                transparent, 
+                var(--cyan-primary) 20%, 
+                var(--pink-accent) 50%, 
+                var(--cyan-primary) 80%, 
+                transparent);
+            margin: 60px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        hr::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.8), 
+                transparent);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        .footer-quote {
+            text-align: center;
+            font-style: italic;
+            color: var(--blue-electric);
+            margin-top: 60px;
+            font-size: 0.9em;
+            opacity: 0.8;
+            text-shadow: 0 0 10px var(--blue-electric);
+        }
+        
+        .short-sentence {
+            margin: 30px 0;
+            font-weight: bold;
+            color: var(--red-glitch);
+            text-align: center;
+            font-size: 1.1em;
+            letter-spacing: 0.1em;
+            text-shadow: 
+                0 0 10px var(--red-glitch),
+                1px 1px 0 var(--pink-accent),
+                -1px -1px 0 var(--cyan-primary);
+            animation: warningPulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes warningPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        /* Glitch text spans */
+        .glitch {
+            position: relative;
+            color: var(--cyan-primary);
+            animation: glitchSkew 0.5s infinite alternate;
+        }
+        
+        @keyframes glitchSkew {
+            0% { transform: skew(0deg); }
+            100% { transform: skew(1deg); }
+        }
+        
+        /* Mathematical intrusions */
+        .math-corrupt {
+            color: var(--lime-code);
+            font-size: 0.9em;
+            opacity: 0.8;
+            text-shadow: 0 0 3px var(--lime-code);
+        }
+        
+        /* System diagnostics */
+        .diagnostic {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--red-glitch);
+            padding: 10px;
+            font-size: 0.8em;
+            color: var(--red-glitch);
+            max-width: 200px;
+            animation: diagnosticFlicker 5s infinite;
+            z-index: 1000;
+        }
+        
+        @keyframes diagnosticFlicker {
+            0%, 100% { opacity: 0; }
+            10%, 40% { opacity: 1; }
+            41%, 42% { opacity: 0; }
+            43%, 90% { opacity: 1; }
+        }
+        
+        /* Chromatic aberration on scroll */
+        @media (prefers-reduced-motion: no-preference) {
+            body {
+                animation: chromaticAberration 0.1s infinite alternate;
+            }
+        }
+        
+        @keyframes chromaticAberration {
+            0% { text-shadow: 0 0 2px rgba(0, 255, 255, 0.5); }
+            100% { text-shadow: -1px 0 2px rgba(255, 0, 0, 0.5), 1px 0 2px rgba(0, 255, 0, 0.5); }
+        }
+'''
+
+# Write file only if changed
+new_html = render()
+try:
+    with open(OUT, "r", encoding="utf-8") as f:
+        old_html = f.read()
+except FileNotFoundError:
+    old_html = ""
+
+if new_html != old_html:
+    with open(OUT, "w", encoding="utf-8") as f:
+        f.write(new_html)
+    print("⟨⟨ index.html regenerated ⟩⟩")
+else:
+    print("⟨⟨ index.html already synchronized ⟩⟩")
