@@ -266,7 +266,7 @@ class SpinglassATProto:
             resp = self.client.com.atproto.repo.create_record(
                 repo=self.client.me.did,
                 collection="com.whitewind.blog.entry",
-                record=record
+                data=record
             )
             uri = resp.uri
             print(f"✓ Published: {record['title']}")
@@ -306,7 +306,7 @@ class SpinglassATProto:
             resp = self.client.com.atproto.repo.create_record(
                 repo=self.client.me.did,
                 collection="com.whitewind.blog.entry",
-                record=record
+                data=record
             )
             print(f"✓ Published index post: {title}")
             return resp.uri
