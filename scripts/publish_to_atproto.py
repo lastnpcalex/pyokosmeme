@@ -190,7 +190,7 @@ class SpinglassATProto:
     def publish_blog(self, html_path: str) -> Optional[str]:
         meta = self.extract_article_metadata(html_path)
         record = {
-            '$type': 'com.whitewind.blog.entry',
+            '$type': 'com.whtwnd.blog.entry',
             'title': meta['title'],
             'content': self.html_to_markdown(html_path),
             'createdAt': datetime.now().isoformat() + 'Z',
@@ -202,7 +202,7 @@ class SpinglassATProto:
         resp = self.blog_client.com.atproto.repo.create_record(
             data=models.ComAtprotoRepoCreateRecord.Data(
                 repo=self.blog_client.me.did,
-                collection='com.whitewind.blog.entry',
+                collection='com.whtwnd.blog.entry',
                 record=record
             )
         )
@@ -221,9 +221,40 @@ class SpinglassATProto:
 
     def publish_article(self, html_path: str) -> None:
         print(f"→ Processing: {html_path}")
-        blog_uri = self.publish_blog(html_path)
+        
+        # This will now return the URI of the com.whtwnd.blog.entry
+        blog_post_response = self.publish_blog(html_path)
+
+        # If the blog post failed, don't try to announce it.
+        if not blog_post_response:
+            print(f"✗ Skipping announcement for {html_path} due to blog post failure.")
+            return
+
+        blog_uri = blog_post_response.uri
         meta = self.extract_article_metadata(html_path)
-        text = self.create_announcement(meta, meta['title'], meta['excerpt'], blog_uri)
+        
+        # --- Build the URLs you want ---
+        # Get the record key (the last part of the URI)
+        rkey = blog_uri.split('/')[-1]
+        
+        # Get the user's handle
+        handle = self.blog_client.me.handle
+
+        # Construct the different URLs
+        whitewind_url = f"https://whtwnd.com/{handle}/entries/{rkey}"
+        bluesky_url = f"https://bsky.app/profile/{handle}/post/{rkey}"
+        custom_spin_url = f"https://spin.pyokosmeme.group/" # Add path if needed
+
+        # Combine them into a multi-line string for the announcement
+        # The Bluesky client will automatically detect and link these
+        url_string = (
+            f"→ Read on WhiteWind: {whitewind_url}\n"
+            f"→ View on Bluesky: {bluesky_url}\n"
+            f"→ Spin Group: {custom_spin_url}"
+        )
+
+        # Create the announcement with the formatted URL string
+        text = self.create_announcement(meta, meta['title'], meta['excerpt'], url_string)
         self.publish_feed(text)
 
     def publish_index(self, paths: List[str]) -> None:
@@ -248,7 +279,7 @@ def main():
     parser = argparse.ArgumentParser(description='Publish spinglasscore to AT Protocol')
     parser.add_argument('--handle',    required=True, help='AT Protocol handle')
     parser.add_argument('--password',  required=True, help='AT Protocol password')
-    parser.add_argument('--blog-url',  default='https://blog.whitewind.com', help='WhiteWind PDS base URL')
+    parser.add_argument('--blog-url',  default='https://blog.whtwnd.com', help='WhiteWind PDS base URL')
     parser.add_argument('--feed-url',  default='https://bsky.social',        help='Bluesky base URL')
 
     group = parser.add_mutually_exclusive_group(required=True)
