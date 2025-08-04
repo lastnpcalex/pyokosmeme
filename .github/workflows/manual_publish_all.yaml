@@ -34,4 +34,6 @@ jobs:
           python scripts/publish_to_atproto.py \
             --handle "$ATPROTO_HANDLE" \
             --password "$ATPROTO_PASSWORD" \
+            --blog-url "https://bsky.social" \
+            --feed-url "https://bsky.social" \
             --all
