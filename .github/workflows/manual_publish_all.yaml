@@ -1,0 +1,36 @@
+name: Manual Publish All to AT Protocol
+
+on:
+  workflow_dispatch:  # only runs when you click “Run workflow”
+
+jobs:
+  publish-all:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Upgrade pip & build tools
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install dependencies
+        run: |
+          pip install atproto
+
+      - name: Publish every HTML article
+        env:
+          ATPROTO_HANDLE: ${{ secrets.ATPROTO_HANDLE }}
+          ATPROTO_PASSWORD: ${{ secrets.ATPROTO_PASSWORD }}
+        run: |
+          python scripts/publish_to_atproto.py \
+            --handle "$ATPROTO_HANDLE" \
+            --password "$ATPROTO_PASSWORD" \
+            --all
