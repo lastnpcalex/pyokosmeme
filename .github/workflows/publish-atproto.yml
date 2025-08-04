@@ -1,0 +1,60 @@
+name: Publish to AT Protocol
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'phase*/*.html'
+  workflow_dispatch:
+    inputs:
+      publish_all:
+        description: 'Publish all articles (not just new ones)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to detect new files
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        run: |
+          pip install atproto
+      
+      - name: Publish to AT Protocol
+        env:
+          ATPROTO_HANDLE: ${{ secrets.ATPROTO_HANDLE }}
+          ATPROTO_PASSWORD: ${{ secrets.ATPROTO_PASSWORD }}
+        run: |
+          if [ "${{ github.event.inputs.publish_all }}" == "true" ]; then
+            echo "Publishing all articles..."
+            python scripts/publish_to_atproto.py \
+              --handle "$ATPROTO_HANDLE" \
+              --password "$ATPROTO_PASSWORD" \
+              --all
+          else
+            echo "Publishing new articles only..."
+            python scripts/publish_to_atproto.py \
+              --handle "$ATPROTO_HANDLE" \
+              --password "$ATPROTO_PASSWORD" \
+              --new-only
+          fi
+      
+      - name: Commit tracking file
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          if [ -f .atproto_last_run ]; then
+            git add .atproto_last_run
+            git diff --cached --quiet || git commit -m "chore: update AT Protocol sync timestamp [skip ci]"
+            git push
+          fi
