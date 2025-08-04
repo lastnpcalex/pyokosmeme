@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install atproto
+          python -m pip install atproto
 
       - name: Publish every HTML article
         env:
