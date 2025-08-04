@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 from pathlib import Path
 
 try:
-    from atproto import Client, models
+    from atproto import Client, models, client_utils
 except ImportError:
     print("ERROR: atproto library not installed")
     print("Install with: pip install atproto")
@@ -20,13 +20,7 @@ except ImportError:
 
 # Announcement templates
 ANNOUNCEMENT_TEMPLATES = {
-    "default": """⟨⟨ NEW SPINGL∆SS NODE ⟩⟩
-
-{title}
-
-"{excerpt}"
-
-→ {url}""",
+    "default": """⟨⟨ NEW SPINGL∆SS NODE ⟩⟩\n\n{title}\n\n"{excerpt}"\n\n→ {url}""",
     "minimal": """new node: {title}\n{url}""",
     "phase_specific": {
         "phaseα": """⟨⟨ PH∆SE Α EMISSION ⟩⟩\n{title}\n"{excerpt}"\n∂S/∂t → ∞\n{url}""",
@@ -46,12 +40,11 @@ class SpinglassATProto:
                  password: str,
                  blog_url: str,
                  feed_url: str):
-        # Client for WhiteWind blog posts
-        self.blog_client = Client(blog_url)
-        # Client for Bluesky feed posts
-        self.feed_client = Client(feed_url)
+        # Instantiate XRPC clients with base URLs (domain only)
+        self.blog_client = Client(blog_url)    # e.g. https://blog.whitewind.com
+        self.feed_client = Client(feed_url)    # e.g. https://bsky.social
 
-        # Login both clients
+        # Authenticate
         self.blog_client.login(handle, password)
         self.feed_client.login(handle, password)
         print(f"→ Authenticated user: {handle}")
@@ -60,14 +53,14 @@ class SpinglassATProto:
         with open(html_path, 'r', encoding='utf-8') as f:
             content = f.read()
         title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', content)
-        title = title_match.group(1) if title_match else 'Untitled'
-        title = re.sub(r'[⟨⟩]', '', title).strip()
+        title = title_match.group(1).strip() if title_match else 'Untitled'
+        title = re.sub(r'[⟨⟩]', '', title)
         p_match = re.search(r'<p>([^<]+)</p>', content)
         excerpt = html.unescape(p_match.group(1) if p_match else '')
         if len(excerpt) > 300:
             excerpt = excerpt[:300] + '...'
         has_glitch = bool(re.search(r'class="glitch"', content))
-        has_math = bool(re.search(r'class="math-corrupt"', content))
+        has_math   = bool(re.search(r'class="math-corrupt"', content))
         lower = html_path.lower()
         if 'phaseα' in lower or 'phasea' in lower:
             phase = 'phaseα'
@@ -77,18 +70,14 @@ class SpinglassATProto:
             phase = 'phaseγ'
         else:
             phase = 'unknown'
-        return {
-            'title': title,
-            'excerpt': excerpt,
-            'has_glitch': has_glitch,
-            'has_math': has_math,
-            'phase': phase
-        }
+        return {'title': title, 'excerpt': excerpt,
+                'has_glitch': has_glitch, 'has_math': has_math,
+                'phase': phase}
 
     def html_to_markdown(self, html_path: str) -> str:
         with open(html_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        # Simple conversion: strip HTML tags
+        # Strip HTML tags for simplicity
         markdown = re.sub(r'<[^>]+>', '', content)
         return markdown.strip()
 
@@ -98,21 +87,24 @@ class SpinglassATProto:
                              excerpt: str,
                              url: str,
                              template: str) -> str:
+        # Auto-select template if needed
         if template == 'auto':
             if metadata['has_glitch']:
                 template = 'glitch'
             elif metadata['has_math']:
                 template = 'mathematical'
-            elif metadata['phase'] in ANNOUNCEMENT_TEMPLATES['phase_specific']:
+            elif metadata['phase'] in ANNOUNCEMENT_TEMPLATES.get('phase_specific', {}):
                 template = metadata['phase']
             else:
                 template = 'default'
-        if template in ANNOUNCEMENT_TEMPLATES['phase_specific']:
+        # Choose template text
+        if template in ANNOUNCEMENT_TEMPLATES.get('phase_specific', {}):
             tpl = ANNOUNCEMENT_TEMPLATES['phase_specific'][template]
         else:
             tpl = ANNOUNCEMENT_TEMPLATES.get(template, ANNOUNCEMENT_TEMPLATES['default'])
-        encoded_title = ''.join([chr(ord(c)+1) for c in title])
-        word_count = len(excerpt.split())
+        # Variables for formatting
+        encoded_title = ''.join(chr(ord(c)+1) for c in title)
+        word_count    = len(excerpt.split())
         topology_status = 'WARPED' if metadata['has_glitch'] else 'STABLE'
         return tpl.format(
             title=title,
@@ -130,14 +122,14 @@ class SpinglassATProto:
                             url: str,
                             template: str = 'default') -> Dict:
         text = self._format_announcement(metadata, title, excerpt, url, template)
-        return {
-            '$type': 'app.bsky.feed.post',
-            'text': text,
-            'createdAt': datetime.now().isoformat() + 'Z'
-        }
+        # Build feed post record
+        return {'$type': 'app.bsky.feed.post', 'text': text,
+                'createdAt': datetime.now().isoformat() + 'Z'}
 
     def publish_blog(self, html_path: str) -> Optional[str]:
+        # Publish Markdown article to WhiteWind blog
         meta = self.extract_article_metadata(html_path)
+        rec = models.AppBskyFeedPost # mistaken import placeholder
         rec = {
             '$type': 'com.whitewind.blog.entry',
             'title': meta['title'],
@@ -159,17 +151,18 @@ class SpinglassATProto:
         return resp.uri
 
     def publish_feed(self, announcement: Dict) -> Optional[str]:
-        resp = self.feed_client.com.atproto.repo.create_record(
-            data=models.ComAtprotoRepoCreateRecord.Data(
-                repo=self.feed_client.me.did,
-                collection='app.bsky.feed.post',
-                record=announcement
-            )
-        )
-        print(f"✓ Announcement posted: {resp.uri}")
-        return resp.uri
+        # Use high-level sugar to send feed post
+        text = announcement['text']
+        try:
+            resp = self.feed_client.send_post(text=text)
+            print(f"✓ Announcement posted: {resp.uri}")
+            return resp.uri
+        except Exception as e:
+            print(f"✗ Failed to post announcement on Bluesky: {e}")
+            return None
 
     def publish_article(self, html_path: str) -> None:
+        # Full flow: blog + feed
         print(f"→ Processing {html_path}")
         blog_uri = self.publish_blog(html_path)
         meta = self.extract_article_metadata(html_path)
@@ -178,9 +171,10 @@ class SpinglassATProto:
 
     def publish_index(self, paths: List[str]) -> None:
         title = f"⟨⟨SPINGL∆SS UPDATE⟩⟩ {len(paths)} new nodes"
-        excerpt = '\n'.join([self.extract_article_metadata(p)['title'] for p in paths])
+        excerpt = '\n'.join(self.extract_article_metadata(p)['title'] for p in paths)
         idx_uri = self.publish_blog(paths[0])
-        ann = self.create_announcement({'has_glitch': False, 'has_math': False, 'phase': 'update'}, title, excerpt, idx_uri)
+        ann = self.create_announcement({'has_glitch': False, 'has_math': False, 'phase': 'update'},
+                                        title, excerpt, idx_uri)
         self.publish_feed(ann)
 
 
@@ -197,11 +191,11 @@ def main():
     parser.add_argument('--handle', required=True, help='AT Protocol handle')
     parser.add_argument('--password', required=True, help='AT Protocol password')
     parser.add_argument('--blog-url',
-                        default='https://blog.whitewind.com/xrpc',
-                        help='WhiteWind PDS XRPC endpoint')
+                        default='https://blog.whitewind.com',
+                        help='WhiteWind PDS base URL')
     parser.add_argument('--feed-url',
-                        default='https://bsky.social/xrpc',
-                        help='Bluesky XRPC endpoint')
+                        default='https://bsky.social',
+                        help='Bluesky base URL')
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--all', action='store_true', help='Publish all HTML files')
     group.add_argument('--file', help='Publish a single HTML file')
