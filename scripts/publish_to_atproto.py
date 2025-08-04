@@ -47,9 +47,9 @@ class SpinglassATProto:
                  blog_url: str,
                  feed_url: str):
         # Client for WhiteWind blog posts
-        self.blog_client = Client(server=blog_url)
+        self.blog_client = Client(blog_url)
         # Client for Bluesky feed posts
-        self.feed_client = Client(server=feed_url)
+        self.feed_client = Client(feed_url)
 
         # Login both clients
         self.blog_client.login(handle, password)
