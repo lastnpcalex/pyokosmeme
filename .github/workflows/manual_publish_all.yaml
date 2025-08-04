@@ -25,6 +25,20 @@ jobs:
         run: |
           python -m pip install atproto
 
+      - name: Debug Environment
+      run: |
+        echo "--- Python and Pip Paths ---"
+        which python
+        which pip
+        echo "--- Python Version ---"
+        python --version
+        echo "--- Pip Version ---"
+        pip --version
+        echo "--- Installed Packages ---"
+        pip list
+        echo "--- Attempting Direct Import ---"
+        python -c "from atproto import Client; print('Direct import of atproto.Client successful!')"
+
       - name: Publish every HTML article
         env:
           ATPROTO_HANDLE: ${{ secrets.ATPROTO_HANDLE }}
