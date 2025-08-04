@@ -279,8 +279,8 @@ def main():
     parser = argparse.ArgumentParser(description='Publish spinglasscore to AT Protocol')
     parser.add_argument('--handle',    required=True, help='AT Protocol handle')
     parser.add_argument('--password',  required=True, help='AT Protocol password')
-    parser.add_argument('--blog-url',  default='https://blog.whtwnd.com', help='WhiteWind PDS base URL')
-    parser.add_argument('--feed-url',  default='https://bsky.social',        help='Bluesky base URL')
+    parser.add_argument('--blog-url',  default='https://bsky.social', help='PDS where blog records are stored')
+    parser.add_argument('--feed-url',  default='https://bsky.social', help='Bluesky base URL')
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--all',      action='store_true', help='Publish all HTML files')
