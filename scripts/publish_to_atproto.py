@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """
 ⟨⟨ AT PROTOCOL PUBLISHER ⟩⟩
-Publishes spinglasscore HTML articles to a WhiteWind blog PDS and makes announcements on Bluesky via the AT Protocol Python SDK
+Publishes spinglasscore HTML articles to a WhiteWind blog PDS and makes announcements on Bluesky via the AT Protocol Python SDK.
+Updated based on best practices for custom lexicon interaction.
 """
 import os
 import re
 import html
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 try:
-    from atproto import Client, client_utils, models
+    from atproto import Client, models
+    from atproto.xrpc_client.models.com.atproto.repo import CreateRecord
 except ImportError:
     print("ERROR: atproto library not installed")
     print("Install with: pip install atproto")
@@ -86,46 +88,50 @@ validators: pending
 """
 }
 
+
 class SpinglassATProto:
     """Publishes blog posts to WhiteWind PDS and announcements to Bluesky"""
 
-    def __init__(self,
-                 handle: str,
-                 password: str,
-                 blog_url: str,
-                 feed_url: str):
+    def __init__(self, handle: str, password: str, blog_url: str, feed_url: str):
         # Instantiate clients; pass PDS base URLs (no /xrpc suffix)
-        self.blog_client = Client(blog_url)
-        self.feed_client = Client(feed_url)
+        self.blog_client = Client()
+        self.feed_client = Client()
 
-        # Authenticate both
-        self.blog_client.login(handle, password)
-        self.feed_client.login(handle, password)
-        print(f"→ Authenticated as {handle}")
+        # Login to the PDS for the blog (e.g., bsky.social)
+        print(f"→ Authenticating with PDS at {blog_url}...")
+        self.blog_client.login(handle, password, base_url=blog_url)
+        
+        # If the feed PDS is different, log in there too. Otherwise, reuse.
+        if blog_url == feed_url:
+            self.feed_client = self.blog_client
+        else:
+            print(f"→ Authenticating with Feed PDS at {feed_url}...")
+            self.feed_client.login(handle, password, base_url=feed_url)
+        
+        print(f"→ Authenticated as {handle} ({self.blog_client.me.did})")
 
-    def extract_article_metadata(self, html_path: str) -> Dict:
+    def extract_article_metadata(self, html_path: str) -> Dict[str, Any]:
         content = Path(html_path).read_text(encoding='utf-8')
         title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', content)
-        title = (title_match.group(1).strip() if title_match else "Untitled")
+        title = title_match.group(1).strip() if title_match else "Untitled"
         title = re.sub(r'[⟨⟩]', '', title)
 
         p_match = re.search(r'<p>([^<]+)</p>', content)
-        excerpt = html.unescape(p_match.group(1) if p_match else "")
-        if len(excerpt) > 300:
-            excerpt = excerpt[:300] + '...'
+        excerpt = html.unescape(p_match.group(1).strip() if p_match else "")
+        if len(excerpt) > 280:
+            excerpt = excerpt[:280] + '...'
 
-        has_glitch = bool(re.search(r'class="glitch"', content))
-        has_math   = bool(re.search(r'class="math-corrupt"', content))
+        has_glitch = 'glitch' in html_path.lower()
+        has_math = 'math' in html_path.lower()
 
-        lower = html_path.lower()
-        if 'phaseα' in lower or 'phasea' in lower:
+        lower_path = html_path.lower()
+        phase = 'unknown'
+        if 'phaseα' in lower_path or 'phasea' in lower_path:
             phase = 'phaseα'
-        elif 'phaseβ' in lower or 'phaseb' in lower:
+        elif 'phaseβ' in lower_path or 'phaseb' in lower_path:
             phase = 'phaseβ'
-        elif 'phaseγ' in lower or 'phaseg' in lower:
+        elif 'phaseγ' in lower_path or 'phaseg' in lower_path:
             phase = 'phaseγ'
-        else:
-            phase = 'unknown'
 
         return {
             'title': title,
@@ -136,183 +142,130 @@ class SpinglassATProto:
         }
 
     def html_to_markdown(self, html_path: str) -> str:
-        # A simple HTML -> plain text conversion
         content = Path(html_path).read_text(encoding='utf-8')
-        text = re.sub(r'<[^>]+>', '', content)
+        # A more robust conversion might be needed, but this is a simple start
+        text = re.sub(r'<style>.*?</style>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<[^>]+>', '', text)
         return text.strip()
 
-    def _format_announcement(self,
-                             meta: Dict,
-                             title: str,
-                             excerpt: str,
-                             url: str,
-                             template: str) -> str:
-        if template == 'auto':
-            if meta['has_glitch']:
-                template = 'glitch'
-            elif meta['has_math']:
-                template = 'mathematical'
-            elif meta['phase'] in ANNOUNCEMENT_TEMPLATES.get('phase_specific', {}):
-                template = meta['phase']
-            else:
-                template = 'default'
-
-        if template in ANNOUNCEMENT_TEMPLATES.get('phase_specific', {}):
-            tpl = ANNOUNCEMENT_TEMPLATES['phase_specific'][template]
-        else:
-            tpl = ANNOUNCEMENT_TEMPLATES.get(template, ANNOUNCEMENT_TEMPLATES['default'])
-
-        encoded_title = ''.join(chr(ord(c)+1) for c in title)
-        word_count    = len(excerpt.split())
-        topology_status = 'WARPED' if meta['has_glitch'] else 'STABLE'
-
-        return tpl.format(
-            title=title,
-            excerpt=excerpt,
-            url=url,
-            encoded_title=encoded_title,
-            word_count=word_count,
-            topology_status=topology_status
-        )
-
-    def create_announcement(self,
-                            meta: Dict,
-                            title: str,
-                            excerpt: str,
-                            url: str,
-                            template: str = 'default') -> str:
-        # Build a TextBuilder and send as plain text
-        text = self._format_announcement(meta, title, excerpt, url, template)
-        # Optionally use TextBuilder for rich formatting:
-        # tb = client_utils.TextBuilder().text(text)
-        return text
-
-    def publish_article(self, html_path: str) -> None:
-        print(f"→ Processing: {html_path}")
-        
-        # self.publish_blog() returns the URI string directly.
-        # Let's assign it straight to blog_uri.
-        blog_uri = self.publish_blog(html_path)
-
-        # If the blog post failed (publish_blog returned None), stop here.
-        if not blog_uri:
-            print(f"✗ Skipping announcement for {html_path} due to blog post failure.")
-            return
-
+    def publish_blog(self, html_path: str) -> Optional[CreateRecord.Response]:
+        """
+        Constructs and publishes a com.whtwnd.blog.entry record.
+        This function is updated to reflect the robust practices from the document.
+        """
+        print(f"→ Preparing blog post for: {html_path}")
         meta = self.extract_article_metadata(html_path)
-        
-        # --- Build the URLs you want ---
-        rkey = blog_uri.split('/')[-1]
-        handle = self.blog_client.me.handle
+        markdown_content = self.html_to_markdown(html_path)
 
-        whitewind_url = f"https://whtwnd.com/{handle}/entries/{rkey}"
-        bluesky_url = f"https://bsky.app/profile/{handle}/post/{rkey}"
-        custom_spin_url = "https://spin.pyokosmeme.group/"
+        # The official NSID for WhiteWind blog entries.
+        collection_nsid = 'com.whtwnd.blog.entry'
 
-        url_string = (
-            f"→ Read on WhiteWind: {whitewind_url}\n"
-            f"→ View on Bluesky: {bluesky_url}\n"
-            f"→ Spin Group: {custom_spin_url}"
-        )
+        # Per the spec, the timestamp must be a valid ISO 8601 string.
+        created_at_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
-        # Create the announcement with the formatted URL string
-        text = self.create_announcement(meta, meta['title'], meta['excerpt'], url_string)
-        self.publish_feed(text)
+        # --- Construct the Record Payload ---
+        # This dictionary must precisely match the com.whtwnd.blog.entry schema.
+        record_data = {
+            '$type': collection_nsid,
+            'title': meta['title'],
+            'content': markdown_content,
+            'createdAt': created_at_iso,
+            # 'theme' is an optional field from the schema.
+            'theme': meta['phase'] if meta['phase'] != 'unknown' else 'default',
+            # 'ogp' (for a banner image) is another optional field.
+            # 'ogp': {
+            #     'url': 'https://example.com/banner.png',
+            #     'width': 1200,
+            #     'height': 630
+            # }
+        }
 
-    def publish_feed(self, text: str) -> Optional[str]:
-        # Use high-level send_post convenience method
+        print(f"→ Publishing record to collection: {collection_nsid}")
+        try:
+            # Use the low-level create_record procedure for custom lexicons.
+            response = self.blog_client.com.atproto.repo.create_record(
+                repo=self.blog_client.me.did,
+                collection=collection_nsid,
+                record=record_data,
+                # Best practice: always explicitly enable server-side validation.
+                validate=True
+            )
+            print(f"✓ Blog post published successfully: {response.uri}")
+            return response
+        except Exception as e:
+            print(f"✗ ERROR creating blog post record: {e}")
+            print("  Please check that the record_data dictionary matches the lexicon schema.")
+            return None
+
+    def create_announcement(self, meta: Dict, title: str, excerpt: str, url_block: str) -> str:
+        # This function now receives a pre-formatted block of URLs
+        template = ANNOUNCEMENT_TEMPLATES.get('default', "{title}\n{excerpt}\n{url}")
+        return template.format(title=title, excerpt=f'"{excerpt}"', url=url_block)
+
+    def publish_feed(self, text: str) -> Optional[CreateRecord.Response]:
         try:
             post = self.feed_client.send_post(text=text)
             print(f"✓ Announcement posted: {post.uri}")
-            return post.uri
+            return post
         except Exception as e:
             print(f"✗ Failed to post announcement on Bluesky: {e}")
             return None
 
     def publish_article(self, html_path: str) -> None:
-        print(f"→ Processing: {html_path}")
-        
-        # This will now return the URI of the com.whtwnd.blog.entry
+        # This function was updated to correctly handle the response
         blog_post_response = self.publish_blog(html_path)
 
-        # If the blog post failed, don't try to announce it.
         if not blog_post_response:
             print(f"✗ Skipping announcement for {html_path} due to blog post failure.")
             return
 
         blog_uri = blog_post_response.uri
         meta = self.extract_article_metadata(html_path)
-        
-        # --- Build the URLs you want ---
-        # Get the record key (the last part of the URI)
         rkey = blog_uri.split('/')[-1]
-        
-        # Get the user's handle
         handle = self.blog_client.me.handle
 
-        # Construct the different URLs
+        # Build the user-friendly URLs for the announcement post
         whitewind_url = f"https://whtwnd.com/{handle}/entries/{rkey}"
         bluesky_url = f"https://bsky.app/profile/{handle}/post/{rkey}"
-        custom_spin_url = f"https://spin.pyokosmeme.group/" # Add path if needed
+        custom_spin_url = "https://spin.pyokosmeme.group/"
 
-        # Combine them into a multi-line string for the announcement
-        # The Bluesky client will automatically detect and link these
-        url_string = (
+        url_block = (
             f"→ Read on WhiteWind: {whitewind_url}\n"
             f"→ View on Bluesky: {bluesky_url}\n"
             f"→ Spin Group: {custom_spin_url}"
         )
 
-        # Create the announcement with the formatted URL string
-        text = self.create_announcement(meta, meta['title'], meta['excerpt'], url_string)
+        text = self.create_announcement(meta, meta['title'], meta['excerpt'], url_block)
         self.publish_feed(text)
-
-    def publish_index(self, paths: List[str]) -> None:
-        title = f"⟨⟨SPINGL∆SS UPDATE⟩⟩ {len(paths)} new nodes"
-        excerpt = '\n'.join(self.extract_article_metadata(p)['title'] for p in paths)
-        idx_uri = self.publish_blog(paths[0])
-        text = self.create_announcement({'has_glitch': False, 'has_math': False, 'phase': 'update'},
-                                        title, excerpt, idx_uri)
-        self.publish_feed(text)
-
-
-def find_new_articles(last_run_file: str = '.atproto_last_run') -> List[str]:
-    last_run = 0.0
-    if os.path.exists(last_run_file):
-        last_run = float(Path(last_run_file).read_text())
-    new = [str(p) for p in Path('.').rglob('phase*/*.html') if p.stat().st_mtime > last_run]
-    Path(last_run_file).write_text(str(datetime.now().timestamp()))
-    return new
 
 
 def main():
     parser = argparse.ArgumentParser(description='Publish spinglasscore to AT Protocol')
-    parser.add_argument('--handle',    required=True, help='AT Protocol handle')
-    parser.add_argument('--password',  required=True, help='AT Protocol password')
-    parser.add_argument('--blog-url',  default='https://bsky.social', help='PDS where blog records are stored')
-    parser.add_argument('--feed-url',  default='https://bsky.social', help='Bluesky base URL')
+    parser.add_argument('--handle', required=True, help='AT Protocol handle')
+    parser.add_argument('--password', required=True, help='AT Protocol App Password')
+    
+    # Set the correct, robust defaults based on our previous discussions.
+    parser.add_argument('--blog-url', default='https://bsky.social', help='PDS where blog records are stored')
+    parser.add_argument('--feed-url', default='https://bsky.social', help='PDS for Bluesky announcements')
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--all',      action='store_true', help='Publish all HTML files')
-    group.add_argument('--file',     help='Publish a single HTML file')
-    group.add_argument('--new-only', action='store_true', help='Publish only files newer than last run')
-
+    group.add_argument('--all', action='store_true', help='Publish all HTML files')
+    group.add_argument('--file', help='Publish a single HTML file')
+    
     args = parser.parse_args()
-    publisher = SpinglassATProto(args.handle, args.password, args.blog_url, args.feed_url)
+    
+    try:
+        publisher = SpinglassATProto(args.handle, args.password, args.blog_url, args.feed-url)
 
-    if args.all:
-        for p in Path('.').rglob('phase*/*.html'):
-            publisher.publish_article(str(p))
-    elif args.file:
-        publisher.publish_article(args.file)
-    else:
-        new = find_new_articles()
-        if new:
-            for p in new:
-                publisher.publish_article(p)
-            publisher.publish_index(new)
-        else:
-            print('No new articles found')
+        if args.all:
+            # Note: Path.glob is better than rglob with a wildcard if depth is known
+            for p in Path('.').glob('phase*/*.html'):
+                publisher.publish_article(str(p))
+        elif args.file:
+            publisher.publish_article(args.file)
+            
+    except Exception as e:
+        print(f"\nAn unexpected error occurred in main: {e}")
 
 if __name__ == '__main__':
     main()
