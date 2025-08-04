@@ -12,6 +12,122 @@ from datetime import datetime
 from typing import Dict, Optional
 from pathlib import Path
 
+# Section for customized announcements
+
+ANNOUNCEMENT_TEMPLATES = {
+    "default": """⟨⟨ NEW SPINGL∆SS NODE ⟩⟩
+
+{title}
+
+"{excerpt}"
+
+→ {url}""",
+    
+    "minimal": """new node: {title}
+{url}""",
+    
+    "phase_specific": {
+        "phaseα": """⟨⟨ PH∆SE Α EMISSION ⟩⟩
+{title}
+"{excerpt}"
+∂S/∂t → ∞
+{url}""",
+        
+        "phaseβ": """⟨⟨ PH∆SE β CRYSTALLIZATION ⟩⟩
+{title}
+spin glass transition detected
+{url}""",
+        
+        "phaseγ": """⟨⟨ PH∆SE γ RADIATION ⟩⟩
+{title}
+topology: {topology_status}
+{url}"""
+    },
+    
+    "glitch": """g̸l̸i̸t̸c̸h̸ ̸d̸e̸t̸e̸c̸t̸e̸d̸
+{title}
+sys.tem.mal//function
+{url}""",
+    
+    "mathematical": """∂[NEW]/∂t = {title}
+∫∫∫ {excerpt} dx dy dz
+lim(t→∞) = {url}""",
+    
+    "cryptic": """◈◈◈◈◈◈◈◈◈◈◈◈
+{encoded_title}
+◈◈◈◈◈◈◈◈◈◈◈◈
+{url}""",
+    
+    "network_state": """CONSENSUS.BROADCAST()
+node: {title}
+stake: {word_count} words
+validators: pending
+{url}"""
+}
+
+def create_announcement_post(self, title: str, excerpt: str, article_url: str, 
+                           blog_uri: str, metadata: Dict, template: str = "default") -> Dict:
+    """Create a Bluesky post with customizable templates"""
+    
+    # Get template based on content analysis
+    if template == "auto":
+        if metadata.get("has_glitch"):
+            template = "glitch"
+        elif metadata.get("has_math"):
+            template = "mathematical"
+        elif metadata.get("phase") in ANNOUNCEMENT_TEMPLATES.get("phase_specific", {}):
+            template_text = ANNOUNCEMENT_TEMPLATES["phase_specific"][metadata["phase"]]
+        else:
+            template = "default"
+    
+    # Get the template
+    if template in ANNOUNCEMENT_TEMPLATES:
+        template_text = ANNOUNCEMENT_TEMPLATES[template]
+    else:
+        template_text = ANNOUNCEMENT_TEMPLATES["default"]
+    
+    # Prepare variables
+    word_count = len(metadata.get("content", "").split())
+    encoded_title = "".join([chr(ord(c) + 1) for c in title[:20]])  # Simple Caesar cipher
+    topology_status = "WARPED" if metadata.get("has_glitch") else "STABLE"
+    
+    # Format announcement
+    announcement = template_text.format(
+        title=title,
+        excerpt=excerpt[:100] + "..." if len(excerpt) > 100 else excerpt,
+        url=article_url,
+        phase=metadata.get("phase", "unknown"),
+        word_count=word_count,
+        encoded_title=encoded_title,
+        topology_status=topology_status
+    )
+    
+    # Ensure it fits in 300 chars
+    if len(announcement) > 300:
+        # Fallback to minimal template
+        announcement = ANNOUNCEMENT_TEMPLATES["minimal"].format(
+            title=title[:50] + "..." if len(title) > 50 else title,
+            url=article_url
+        )
+    
+    # Create the post record
+    post = {
+        "$type": "app.bsky.feed.post",
+        "text": announcement,
+        "createdAt": datetime.now().isoformat() + "Z",
+        "langs": ["en"]
+    }
+    
+    return post
+
+# Add command line option for template selection
+parser.add_argument("--announce-template", 
+                   choices=["default", "minimal", "glitch", "mathematical", 
+                           "cryptic", "network_state", "auto"],
+                   default="default",
+                   help="Template for announcement posts")
+
+
 # AT Protocol imports (install with: pip install atproto)
 try:
     from atproto import Client, models
