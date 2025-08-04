@@ -1,7 +1,7 @@
 name: Manual Publish All to AT Protocol
 
 on:
-  workflow_dispatch:  # only runs when you click “Run workflow”
+  workflow_dispatch:
 
 jobs:
   publish-all:
@@ -30,6 +30,7 @@ jobs:
           ATPROTO_HANDLE: ${{ secrets.ATPROTO_HANDLE }}
           ATPROTO_PASSWORD: ${{ secrets.ATPROTO_PASSWORD }}
         run: |
+          echo "🔄 Publishing all HTML files to AT Protocol…"
           python scripts/publish_to_atproto.py \
             --handle "$ATPROTO_HANDLE" \
             --password "$ATPROTO_PASSWORD" \
