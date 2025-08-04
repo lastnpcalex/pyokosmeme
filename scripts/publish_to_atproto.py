@@ -1,32 +1,15 @@
 #!/usr/bin/env python3
 """
 ⟨⟨ AT PROTOCOL PUBLISHER ⟩⟩
-Publishes spinglasscore articles to the AT Protocol network via WhiteWind and broadcasts on Bluesky
+Publishes spinglasscore articles to the AT Protocol network via WhiteWind PDS and broadcasts on Bluesky
 """
 import os
 import re
 import html
 import argparse
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from pathlib import Path
-
-# Templates for announcements
-ANNOUNCEMENT_TEMPLATES = {
-    "default": """⟨⟨ NEW SPINGL∆SS NODE ⟩⟩
-
-{title}
-
-"{excerpt}"
-
-→ {url}""",
-    # Other templates omitted for brevity
-    "network_state": """CONSENSUS.BROADCAST()
-node: {title}
-stake: {word_count} words
-validators: pending
-{url}"""
-}
 
 try:
     from atproto import Client, models
@@ -35,171 +18,173 @@ except ImportError:
     print("Install with: pip install atproto")
     exit(1)
 
-class SpinglassATProto:
-    """Bridges spinglasscore HTML articles to AT Protocol and Bluesky"""
+# Announcement templates
+ANNOUNCEMENT_TEMPLATES = {
+    "default": """⟨⟨ NEW SPINGL∆SS NODE ⟩⟩
 
-    def __init__(self, handle: str, password: str):
-        self.client = Client()
-        resp = self.client.login(handle, password)
-        print(f"→ Logged in as DID: {resp.did}")
+{title}
+
+"{excerpt}"
+
+→ {url}""",
+    "minimal": """new node: {title}\n{url}""",
+    "phase_specific": {
+        "phaseα": """⟨⟨ PH∆SE Α EMISSION ⟩⟩\n{title}\n"{excerpt}"\n∂S/∂t → ∞\n{url}""",
+        "phaseβ": """⟨⟨ PH∆SE β CRYSTALLIZATION ⟩⟩\n{title}\nspin glass transition detected\n{url}""",
+        "phaseγ": """⟨⟨ PH∆SE γ RADIATION ⟩⟩\n{title}\ntopology: {topology_status}\n{url}"""
+    },
+    "glitch": """g̸l̸i̸t̸c̸h̸ ̸d̸e̸t̸e̸c̸t̸e̸d̸\n{title}\nsys.tem.mal//function\n{url}""",
+    "mathematical": """∂[NEW]/∂t = {title}\n∫∫∫ {excerpt} dx dy dz\nlim(t→∞) = {url}""",
+    "cryptic": """◈◈◈◈◈◈◈◈◈◈◈◈\n{encoded_title}\n◈◈◈◈◈◈◈◈◈◈◈◈\n{url}""",
+    "network_state": """CONSENSUS.BROADCAST()\nnode: {title}\nstake: {word_count} words\nvalidators: pending\n{url}"""
+}
+
+class SpinglassATProto:
+    """Handles publishing to both WhiteWind PDS and Bluesky"""
+    def __init__(self,
+                 handle: str,
+                 password: str,
+                 blog_url: str,
+                 feed_url: str):
+        # Client for WhiteWind blog posts
+        self.blog_client = Client(server=blog_url)
+        # Client for Bluesky feed posts
+        self.feed_client = Client(server=feed_url)
+
+        # Login both clients
+        self.blog_client.login(handle, password)
+        self.feed_client.login(handle, password)
+        print(f"→ Authenticated user: {handle}")
 
     def extract_article_metadata(self, html_path: str) -> Dict:
         with open(html_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        title = (re.search(r'<h1[^>]*>([^<]+)</h1>', content) or [None, 'Untitled'])[1]
+        title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', content)
+        title = title_match.group(1) if title_match else 'Untitled'
         title = re.sub(r'[⟨⟩]', '', title).strip()
-        excerpt = (re.search(r'<p>([^<]+)</p>', content) or [None, ''])[1]
-        excerpt = html.unescape(excerpt)
+        p_match = re.search(r'<p>([^<]+)</p>', content)
+        excerpt = html.unescape(p_match.group(1) if p_match else '')
         if len(excerpt) > 300:
             excerpt = excerpt[:300] + '...'
         has_glitch = bool(re.search(r'class="glitch"', content))
-        has_math   = bool(re.search(r'class="math-corrupt"', content))
-        lower_path = html_path.lower()
-        if 'phaseα' in lower_path or 'phasea' in lower_path:
+        has_math = bool(re.search(r'class="math-corrupt"', content))
+        lower = html_path.lower()
+        if 'phaseα' in lower or 'phasea' in lower:
             phase = 'phaseα'
-        elif 'phaseβ' in lower_path or 'phaseb' in lower_path:
+        elif 'phaseβ' in lower or 'phaseb' in lower:
             phase = 'phaseβ'
-        elif 'phaseγ' in lower_path or 'phaseg' in lower_path:
+        elif 'phaseγ' in lower or 'phaseg' in lower:
             phase = 'phaseγ'
         else:
             phase = 'unknown'
-        return {'title': title, 'excerpt': excerpt,
-                'has_glitch': has_glitch, 'has_math': has_math,
-                'phase': phase}
+        return {
+            'title': title,
+            'excerpt': excerpt,
+            'has_glitch': has_glitch,
+            'has_math': has_math,
+            'phase': phase
+        }
 
     def html_to_markdown(self, html_path: str) -> str:
         with open(html_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        # Conversion logic omitted for brevity
-        return content.strip()
+        # Simple conversion: strip HTML tags
+        markdown = re.sub(r'<[^>]+>', '', content)
+        return markdown.strip()
 
-    def create_announcement_post(self,
-                                 title: str,
-                                 excerpt: str,
-                                 article_url: str,
-                                 metadata: Dict,
-                                 template: str = "default") -> Dict:
-        # Auto-pick template
+    def _format_announcement(self,
+                             metadata: Dict,
+                             title: str,
+                             excerpt: str,
+                             url: str,
+                             template: str) -> str:
         if template == 'auto':
-            if metadata.get('has_glitch'):
+            if metadata['has_glitch']:
                 template = 'glitch'
-            elif metadata.get('has_math'):
+            elif metadata['has_math']:
                 template = 'mathematical'
-            elif metadata.get('phase') in ANNOUNCEMENT_TEMPLATES:
+            elif metadata['phase'] in ANNOUNCEMENT_TEMPLATES['phase_specific']:
                 template = metadata['phase']
             else:
                 template = 'default'
-        tpl = ANNOUNCEMENT_TEMPLATES.get(template, ANNOUNCEMENT_TEMPLATES['default'])
-        word_count = len(metadata.get('excerpt', '').split())
-        text = tpl.format(title=title,
-                          excerpt=excerpt,
-                          url=article_url,
-                          word_count=word_count)
-        return {'$type': 'app.bsky.feed.post',
-                'text': text,
-                'createdAt': datetime.now().isoformat() + 'Z'}
+        if template in ANNOUNCEMENT_TEMPLATES['phase_specific']:
+            tpl = ANNOUNCEMENT_TEMPLATES['phase_specific'][template]
+        else:
+            tpl = ANNOUNCEMENT_TEMPLATES.get(template, ANNOUNCEMENT_TEMPLATES['default'])
+        encoded_title = ''.join([chr(ord(c)+1) for c in title])
+        word_count = len(excerpt.split())
+        topology_status = 'WARPED' if metadata['has_glitch'] else 'STABLE'
+        return tpl.format(
+            title=title,
+            excerpt=excerpt,
+            url=url,
+            encoded_title=encoded_title,
+            word_count=word_count,
+            topology_status=topology_status
+        )
 
-    def publish_article(self, html_path: str) -> Optional[str]:
-        print(f"→ Publishing file: {html_path}")
-        metadata = self.extract_article_metadata(html_path)
-        # 1) Publish blog post
-        record = {
-            '$type': 'com.whtwnd.blog.entry',  # corrected collection ID
-            'title': metadata['title'],
+    def create_announcement(self,
+                            metadata: Dict,
+                            title: str,
+                            excerpt: str,
+                            url: str,
+                            template: str = 'default') -> Dict:
+        text = self._format_announcement(metadata, title, excerpt, url, template)
+        return {
+            '$type': 'app.bsky.feed.post',
+            'text': text,
+            'createdAt': datetime.now().isoformat() + 'Z'
+        }
+
+    def publish_blog(self, html_path: str) -> Optional[str]:
+        meta = self.extract_article_metadata(html_path)
+        rec = {
+            '$type': 'com.whitewind.blog.entry',
+            'title': meta['title'],
             'content': self.html_to_markdown(html_path),
             'createdAt': datetime.now().isoformat() + 'Z',
             'theme': 'dark',
-            'tags': ([metadata['phase']] +
-                     (['glitch'] if metadata['has_glitch'] else []) +
-                     (['mathematics'] if metadata['has_math'] else []))[:5]
+            'tags': ([meta['phase']] +
+                     (['glitch'] if meta['has_glitch'] else []) +
+                     (['mathematics'] if meta['has_math'] else []))[:5]
         }
-        try:
-            resp = self.client.com.atproto.repo.create_record(
-                data=models.ComAtprotoRepoCreateRecord.Data(
-                    repo=self.client.me.did,
-                    collection='com.whtwnd.blog.entry',
-                    record=record
-                ),
-                validate=False  # skip local Lexicon validation
+        resp = self.blog_client.com.atproto.repo.create_record(
+            data=models.ComAtprotoRepoCreateRecord.Data(
+                repo=self.blog_client.me.did,
+                collection='com.whitewind.blog.entry',
+                record=rec
             )
-            blog_uri = resp.uri
-            print(f"   ✓ Blog post URI={blog_uri}")
-        except Exception as e:
-            print(f"✗ Failed to publish blog entry {html_path}: {e}")
-            return None
-        # 2) Publish announcement on Bluesky
-        ann = self.create_announcement_post(
-            title=metadata['title'],
-            excerpt=metadata['excerpt'],
-            article_url=blog_uri,
-            metadata=metadata
         )
-        try:
-            resp2 = self.client.com.atproto.repo.create_record(
-                data=models.ComAtprotoRepoCreateRecord.Data(
-                    repo=self.client.me.did,
-                    collection='app.bsky.feed.post',
-                    record=ann
-                ),
-                validate=False  # skip local Lexicon validation
-            )
-            print(f"   ✓ Bluesky announcement URI={resp2.uri}")
-        except Exception as e:
-            print(f"✗ Failed to post announcement on Bluesky: {e}")
-        return blog_uri
+        print(f"✓ Blog published: {resp.uri}")
+        return resp.uri
 
-    def publish_index_post(self, new_articles: list) -> Optional[str]:
-        if not new_articles:
-            return None
-        title = f"⟨⟨SPINGL∆SS UPDATE⟩⟩ {len(new_articles)} new nodes"
-        content = '\n\n'.join(
-            f"◈ **{self.extract_article_metadata(a)['title']}**" for a in new_articles
-        )
-        record = {
-            '$type': 'com.whtwnd.blog.entry',  # corrected collection ID
-            'title': title,
-            'content': content,
-            'createdAt': datetime.now().isoformat() + 'Z',
-            'theme': 'dark',
-            'tags': ['spinglasscore', 'update', 'archive']
-        }
-        try:
-            resp = self.client.com.atproto.repo.create_record(
-                data=models.ComAtprotoRepoCreateRecord.Data(
-                    repo=self.client.me.did,
-                    collection='com.whtwnd.blog.entry',
-                    record=record
-                ),
-                validate=False  # skip local Lexicon validation
+    def publish_feed(self, announcement: Dict) -> Optional[str]:
+        resp = self.feed_client.com.atproto.repo.create_record(
+            data=models.ComAtprotoRepoCreateRecord.Data(
+                repo=self.feed_client.me.did,
+                collection='app.bsky.feed.post',
+                record=announcement
             )
-            idx_uri = resp.uri
-            print(f"✓ Index blog post URI={idx_uri}")
-        except Exception as e:
-            print(f"✗ Failed to publish index post: {e}")
-            return None
-        # Announce index on Bluesky
-        ann = self.create_announcement_post(
-            title=title,
-            excerpt=content[:200] + '...',
-            article_url=idx_uri,
-            metadata={'has_glitch': False, 'has_math': False, 'phase': 'update'}
         )
-        try:
-            resp2 = self.client.com.atproto.repo.create_record(
-                data=models.ComAtprotoRepoCreateRecord.Data(
-                    repo=self.client.me.did,
-                    collection='app.bsky.feed.post',
-                    record=ann
-                ),
-                validate=False  # skip local Lexicon validation
-            )
-            print(f"✓ Bluesky index announcement URI={resp2.uri}")
-        except Exception as e:
-            print(f"✗ Failed to announce index on Bluesky: {e}")
-        return idx_uri
+        print(f"✓ Announcement posted: {resp.uri}")
+        return resp.uri
+
+    def publish_article(self, html_path: str) -> None:
+        print(f"→ Processing {html_path}")
+        blog_uri = self.publish_blog(html_path)
+        meta = self.extract_article_metadata(html_path)
+        ann = self.create_announcement(meta, meta['title'], meta['excerpt'], blog_uri)
+        self.publish_feed(ann)
+
+    def publish_index(self, paths: List[str]) -> None:
+        title = f"⟨⟨SPINGL∆SS UPDATE⟩⟩ {len(paths)} new nodes"
+        excerpt = '\n'.join([self.extract_article_metadata(p)['title'] for p in paths])
+        idx_uri = self.publish_blog(paths[0])
+        ann = self.create_announcement({'has_glitch': False, 'has_math': False, 'phase': 'update'}, title, excerpt, idx_uri)
+        self.publish_feed(ann)
 
 
-def find_new_articles(last_run_file: str = ".atproto_last_run") -> list:
+def find_new_articles(last_run_file: str = '.atproto_last_run') -> List[str]:
     last_run = float(open(last_run_file).read()) if os.path.exists(last_run_file) else 0.0
     new = [str(p) for p in Path('.').rglob('phase*/*.html') if p.stat().st_mtime > last_run]
     with open(last_run_file, 'w') as f:
@@ -208,43 +193,42 @@ def find_new_articles(last_run_file: str = ".atproto_last_run") -> list:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Publish spinglasscore to AT Protocol")
-    parser.add_argument("--announce-template",
-                        choices=["default","minimal","glitch","mathematical",
-                                 "cryptic","network_state","auto"],
-                        default="default",
-                        help="Template for announcement posts")
-    parser.add_argument("--handle", required=True, help="AT Protocol handle")
-    parser.add_argument("--password", required=True, help="AT Protocol password")
-    parser.add_argument("--all", action="store_true", help="Publish all articles")
-    parser.add_argument("--file", help="Publish a single HTML file")
-    parser.add_argument("--new-only", action="store_true",
-                        help="Publish only files newer than last run")
+    parser = argparse.ArgumentParser(description='Publish spinglasscore to AT Protocol')
+    parser.add_argument('--handle', required=True, help='AT Protocol handle')
+    parser.add_argument('--password', required=True, help='AT Protocol password')
+    parser.add_argument('--blog-url',
+                        default='https://blog.whitewind.com/xrpc',
+                        help='WhiteWind PDS XRPC endpoint')
+    parser.add_argument('--feed-url',
+                        default='https://bsky.social/xrpc',
+                        help='Bluesky XRPC endpoint')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--all', action='store_true', help='Publish all HTML files')
+    group.add_argument('--file', help='Publish a single HTML file')
+    group.add_argument('--new-only', action='store_true', help='Publish only files newer than last run')
     args = parser.parse_args()
 
-    publisher = SpinglassATProto(args.handle, args.password)
+    publisher = SpinglassATProto(
+        args.handle,
+        args.password,
+        args.blog_url,
+        args.feed_url
+    )
 
-    if args.file:
+    if args.all:
+        paths = [str(p) for p in Path('.').rglob('phase*/*.html')]
+        for p in paths:
+            publisher.publish_article(p)
+    elif args.file:
         publisher.publish_article(args.file)
-
-    elif args.all:
-        html_files = [str(p) for p in Path('.').rglob('phase*/*.html')]
-        print(f"→ Found {len(html_files)} HTML file(s) to publish:")
-        for f in html_files:
-            print(f"   • {f}")
-        for f in html_files:
-            publisher.publish_article(f)
-
-    elif args.new_only:
-        new = find_new_articles()
-        if new:
-            for p in new:
-                publisher.publish_article(p)
-            publisher.publish_index_post(new)
-        else:
-            print("No new articles found")
     else:
-        print("Specify --all, --new-only, or --file")
+        new_paths = find_new_articles()
+        if new_paths:
+            for p in new_paths:
+                publisher.publish_article(p)
+            publisher.publish_index(new_paths)
+        else:
+            print('No new articles found')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
