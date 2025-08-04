@@ -187,27 +187,37 @@ class SpinglassATProto:
         # tb = client_utils.TextBuilder().text(text)
         return text
 
-    def publish_blog(self, html_path: str) -> Optional[str]:
+    def publish_article(self, html_path: str) -> None:
+        print(f"→ Processing: {html_path}")
+        
+        # self.publish_blog() returns the URI string directly.
+        # Let's assign it straight to blog_uri.
+        blog_uri = self.publish_blog(html_path)
+
+        # If the blog post failed (publish_blog returned None), stop here.
+        if not blog_uri:
+            print(f"✗ Skipping announcement for {html_path} due to blog post failure.")
+            return
+
         meta = self.extract_article_metadata(html_path)
-        record = {
-            '$type': 'com.whtwnd.blog.entry',
-            'title': meta['title'],
-            'content': self.html_to_markdown(html_path),
-            'createdAt': datetime.now().isoformat() + 'Z',
-            'theme': 'dark',
-            'tags': ([meta['phase']] +
-                     (['glitch'] if meta['has_glitch'] else []) +
-                     (['mathematics'] if meta['has_math'] else []))[:5]
-        }
-        resp = self.blog_client.com.atproto.repo.create_record(
-            data=models.ComAtprotoRepoCreateRecord.Data(
-                repo=self.blog_client.me.did,
-                collection='com.whtwnd.blog.entry',
-                record=record
-            )
+        
+        # --- Build the URLs you want ---
+        rkey = blog_uri.split('/')[-1]
+        handle = self.blog_client.me.handle
+
+        whitewind_url = f"https://whtwnd.com/{handle}/entries/{rkey}"
+        bluesky_url = f"https://bsky.app/profile/{handle}/post/{rkey}"
+        custom_spin_url = "https://spin.pyokosmeme.group/"
+
+        url_string = (
+            f"→ Read on WhiteWind: {whitewind_url}\n"
+            f"→ View on Bluesky: {bluesky_url}\n"
+            f"→ Spin Group: {custom_spin_url}"
         )
-        print(f"✓ Blog published: {resp.uri}")
-        return resp.uri
+
+        # Create the announcement with the formatted URL string
+        text = self.create_announcement(meta, meta['title'], meta['excerpt'], url_string)
+        self.publish_feed(text)
 
     def publish_feed(self, text: str) -> Optional[str]:
         # Use high-level send_post convenience method
